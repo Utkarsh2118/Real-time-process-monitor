@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Pulse | Advanced System Monitor</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body data-theme="cyberpunk">
+
+  <!-- Auth Modal -->
+  <div id="authModal" class="modal-overlay hidden">
+    <div class="modal-box auth-modal">
+      <div class="modal-header">
+        <div class="logo-icon">▲</div>
+        <h2>PULSE<span>MONITOR</span></h2>
+      </div>
+      <p class="auth-sub">Enter password to access the dashboard</p>
+      <input type="password" id="authInput" placeholder="Password..." />
+      <div class="auth-btns">
+        <button class="btn-primary" onclick="submitAuth()">Unlock</button>
+        <button class="btn-ghost" onclick="submitAuth(true)">View Only</button>
+      </div>
+      <div id="authError" class="auth-error"></div>
+    </div>
+  </div>
+
+  <!-- Process Detail Modal -->
+  <div id="processModal" class="modal-overlay hidden">
+    <div class="modal-box process-modal">
+      <div class="modal-header-row">
+        <h3>Process Details</h3>
+        <button class="close-btn" onclick="closeModal('processModal')">✕</button>
+      </div>
+      <div id="processModalContent"></div>
+    </div>
+  </div>
+
+  <!-- Automation Panel -->
+  <div id="automationModal" class="modal-overlay hidden">
+    <div class="modal-box auto-modal">
+      <div class="modal-header-row">
+        <h3>Automation & Alerts</h3>
+        <button class="close-btn" onclick="closeModal('automationModal')">✕</button>
+      </div>
+      <div class="auto-content">
+        <h4>Webhook URIs</h4>
+        <input type="text" id="webhookInput" placeholder="Discord / Slack webhook...">
+        <button class="btn-primary" onclick="saveWebhook()">Save Webhook</button>
+        <hr>
+        <h4>Auto-Kill Rules</h4>
+        <div class="rule-builder">
+          <label>Kill process if CPU > <input type="number" id="autoCpu" value="95" style="width:60px">% for 
+          <input type="number" id="autoSec" value="30" style="width:60px">s</label>
+          <button class="btn-danger-outline" onclick="addAutoKillRule()">Add Rule</button>
+        </div>
+        <ul id="ruleList" class="rule-list"></ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- Header -->
+  <header>
+    <div class="brand">
+      <div class="logo-icon" id="logoIcon">▲</div>
+      <div class="brand-text">
+        <h1>PULSE<span>MONITOR</span></h1>
+        <div id="osBadge" class="os-badge">Detecting OS...</div>
+      </div>
+    </div>
+    <div class="header-center">
+      <div class="timeline-controls">
+        <span class="label">ZOOM</span>
+        <button class="zoom-btn active" data-zoom="1">1m</button>
+        <button class="zoom-btn" data-zoom="5">5m</button>
+        <button class="zoom-btn" data-zoom="60">1h</button>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="health-score-wrap">
+        <span class="label">HEALTH</span>
+        <span id="healthScoreBadge" class="score-badge">--</span>
+      </div>
+      <button class="icon-btn tooltip-host" onclick="document.getElementById('automationModal').classList.remove('hidden')" title="Automation">
+        ⚙
+      </button>
+      <button class="icon-btn tooltip-host" onclick="toggleHud()" title="HUD Mode">
+        ⛶
+      </button>
+      <button class="theme-toggle" id="themeToggle" title="Toggle Theme">
+        <span class="theme-icon">◑</span>
+      </button>
+      <button class="icon-btn" onclick="showExportMenu()" title="Export Data">⬇</button>
+      <div id="connStatus" class="status-pill disconnected">Connecting...</div>
+      <div>
+        <div id="uptimeDisplay" class="uptime">Uptime: --:--:--</div>
+        <div id="lastUpdated" class="last-updated">Waiting for sync...</div>
+      </div>
+    </div>
+  </header>
+
+  <!-- System Info Bar -->
+  <div class="system-bar">
+    <div class="sys-item">
+      <span class="label">CPU MODEL:</span>
+      <span id="cpuModel" class="value">Loading...</span>
+    </div>
+    <div class="sys-item">
+      <span class="label">LOAD AVG:</span>
+      <span id="loadAvg" class="value">-- , -- , --</span>
+    </div>
+    <div class="sys-item">
+      <span class="label">CPU TEMP:</span>
+      <span id="cpuTempDisplay" class="value temp-val">--°C</span>
+    </div>
+    <div class="sys-item" id="batteryBar" style="display:none">
+      <span class="label">BATTERY:</span>
+      <span id="batteryDisplay" class="value">--</span>
+    </div>
+    <div class="sys-item status-wrap">
+      <span class="label">CORE:</span>
+      <span class="status-indicator online"></span>
+      <span class="value">Active</span>
+    </div>
+    <div class="sys-item" id="readOnlyBadge" style="display:none">
+      <span class="badge badge-readonly">READ ONLY</span>
+    </div>
+  </div>
+
+  <!-- Alert Banner -->
+  <div id="alertBox" class="alert-box"></div>
+
+  <main class="dashboard-grid">
+
+    <!-- CPU CARD -->
+    <div class="dashboard-card cpu-card">
+      <div class="card-header">
+        <div class="card-title">
+          <span class="icon">📈</span>
+          <h2>CPU Usage</h2>
+        </div>
+        <div class="card-header-right">
+          <div class="temp-badge" id="cpuTempBadge" style="display:none"></div>
+          <div class="big-value" id="cpuValue">0%</div>
+        </div>
+      </div>
+      <div class="chart-container">
+        <canvas id="cpuChart"></canvas>
+      </div>
+      <div class="progress-container">
+        <div class="progress-track">
+          <div class="progress-bar" id="cpuBar"></div>
+        </div>
+      </div>
+      <!-- CPU Cores Breakdown -->
+      <div class="cores-section">
+        <div class="cores-label">CORE BREAKDOWN</div>
+        <div id="coresBars" class="cores-grid"></div>
+      </div>
+    </div>
+
+    <!-- MEMORY CARD -->
+    <div class="dashboard-card memory-card">
+      <div class="card-header">
+        <div class="card-title">
+          <span class="icon">🧠</span>
+          <h2>Memory Load</h2>
+        </div>
+        <div class="big-value" id="memPercent">0%</div>
+      </div>
+      <div class="mem-details">
+        <div class="chart-mini">
+          <canvas id="memChart"></canvas>
+        </div>
+        <div class="stats-list">
+          <div class="stat-item">
+            <span class="label">Used</span>
+            <span id="memUsed" class="val">--</span>
+          </div>
+          <div class="stat-item">
+            <span class="label">Total</span>
+            <span id="memTotal" class="val">--</span>
+          </div>
+          <div class="stat-item">
+            <span class="label">Free</span>
+            <span id="memFree" class="val">--</span>
+          </div>
+        </div>
+      </div>
+      <div class="progress-container">
+        <div class="progress-track">
+          <div class="progress-bar" id="memBar" style="background:#ff3d71"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DISK CARD -->
+    <div class="dashboard-card disk-card">
+      <div class="card-header">
+        <div class="card-title">
+          <span class="icon">💾</span>
+          <h2>Disk Storage</h2>
+        </div>
+        <div class="big-value" id="diskPercent">0%</div>
+      </div>
+      <div class="chart-container mini">
+        <canvas id="diskChart"></canvas>
+      </div>
+      <div class="stat-row">
+        <span class="label">Used Space</span>
+        <span id="diskUsed" class="val">--</span>
+      </div>
+      <div class="io-stats">
+        <div class="io"><span class="io-lbl">R</span> <span id="diskRead">0 MB/s</span></div>
+        <div class="io"><span class="io-lbl">W</span> <span id="diskWrite">0 MB/s</span></div>
+      </div>
+    </div>
+
+    <!-- NETWORK CARD -->
+    <div class="dashboard-card network-card">
+      <div class="card-header">
+        <div class="card-title">
+          <span class="icon">🌐</span>
+          <h2>Network Activity</h2>
+        </div>
+        <div class="net-summary">
+          <div class="net-stat down">
+            <span class="icon">↓</span>
+            <span id="netDown">0 KB/s</span>
+          </div>
+          <div class="net-stat up">
+            <span class="icon">↑</span>
+            <span id="netUp">0 KB/s</span>
+          </div>
+        </div>
+      </div>
+      <div class="chart-container">
+        <canvas id="netChart"></canvas>
+      </div>
+    </div>
+
+    <!-- GPU CARD (hidden until data arrives) -->
+    <div class="dashboard-card gpu-card" id="gpuCard" style="display:none">
+      <div class="card-header">
+        <div class="card-title">
+          <span class="icon">🎮</span>
+          <h2>GPU</h2>
+        </div>
+        <div class="big-value" id="gpuUsage">--%</div>
+      </div>
+      <div id="gpuDetails" class="gpu-details"></div>
+      <div class="progress-container">
+        <div class="progress-track">
+          <div class="progress-bar" id="gpuBar" style="background: linear-gradient(90deg, var(--accent-green), var(--accent-blue))"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- NETWORK CONNECTIONS CARD -->
+    <div class="dashboard-card connections-card" id="connectionsCard" draggable="true">
+      <div class="card-header">
+        <div class="card-title">
+          <span class="icon">🔌</span>
+          <h2>Active Connections</h2>
+        </div>
+        <span id="connCount" class="badge">0</span>
+      </div>
+      <div class="connections-table-wrap">
+        <table class="connections-table">
+          <thead>
+            <tr>
+              <th>Protocol</th>
+              <th>Local Port</th>
+              <th>Remote</th>
+              <th>State</th>
+            </tr>
+          </thead>
+          <tbody id="connectionsList"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- DOCKER CARD -->
+    <div class="dashboard-card docker-card" id="dockerCard" style="display:none" draggable="true">
+      <div class="card-header">
+        <div class="card-title">
+          <span class="icon">🐳</span>
+          <h2>Docker Containers</h2>
+        </div>
+        <span id="dockerCount" class="badge">0</span>
+      </div>
+      <div class="connections-table-wrap">
+        <table class="connections-table">
+          <tbody id="dockerList"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- SERVICES CARD -->
+    <div class="dashboard-card connections-card" id="servicesCard" draggable="true">
+      <div class="card-header">
+        <div class="card-title">
+          <span class="icon">⚙️</span>
+          <h2>System Services</h2>
+        </div>
+        <span id="serviceCount" class="badge">0</span>
+      </div>
+      <div class="connections-table-wrap">
+        <table class="connections-table">
+          <thead>
+            <tr>
+              <th>Service</th>
+              <th>Status</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="servicesList"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- PROCESS TABLE -->
+    <section class="process-section">
+      <div class="section-header">
+        <div class="title-wrap">
+          <h2>Active Processes</h2>
+          <span id="procCount" class="badge">0 Total</span>
+        </div>
+        <div class="table-controls">
+          <div class="search-box">
+            <input type="text" id="search" placeholder="Filter processes..." oninput="renderProcesses()" />
+          </div>
+          <select id="sort" onchange="renderProcesses()">
+            <option value="cpu">Sort by CPU</option>
+            <option value="memory">Sort by RAM</option>
+          </select>
+          <button class="btn-danger-outline" id="batchKillBtn" onclick="batchKill()" style="display:none">Kill Selected</button>
+        </div>
+      </div>
+      <div class="table-wrapper">
+        <table id="processTableMain">
+          <thead>
+            <tr>
+              <th><input type="checkbox" id="selectAll" onchange="toggleSelectAll(this)"></th>
+              <th>PID</th>
+              <th>Application</th>
+              <th>CPU %</th>
+              <th>History</th>
+              <th>RAM %</th>
+              <th>Status</th>
+              <th>Controls</th>
+            </tr>
+          </thead>
+          <tbody id="processTable"></tbody>
+        </table>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Export Menu -->
+  <div id="exportMenu" class="dropdown-menu hidden">
+    <div class="dropdown-item" onclick="exportData('json', 60)">Export JSON (1 hour)</div>
+    <div class="dropdown-item" onclick="exportData('csv', 60)">Export CSV (1 hour)</div>
+    <div class="dropdown-item" onclick="exportData('json', 5)">Export JSON (5 min)</div>
+    <div class="dropdown-item" onclick="exportData('csv', 5)">Export CSV (5 min)</div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>

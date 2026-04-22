@@ -1,0 +1,30 @@
+[
+  {
+    "timestamp": "2026-04-19T16:46:26.218Z",
+    "type": "KILL",
+    "pid": 19648,
+    "processName": "conhost.exe",
+    "killedBy": "::1"
+  },
+  {
+    "timestamp": "2026-04-20T07:52:03.138Z",
+    "type": "KILL",
+    "pid": 60908,
+    "processName": "brave.exe",
+    "killedBy": "::1"
+  },
+  {
+    "timestamp": "2026-04-21T15:41:45.472Z",
+    "type": "KILL",
+    "pid": 13464,
+    "processName": "explorer.exe",
+    "killedBy": "::1"
+  },
+  {
+    "timestamp": "2026-04-21T15:41:57.526Z",
+    "type": "KILL",
+    "pid": 11964,
+    "processName": "brave.exe",
+    "killedBy": "::1"
+  }
+]
