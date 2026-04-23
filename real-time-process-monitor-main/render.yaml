@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: pulse-monitor
+    runtime: node
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: PORT
+        value: 4000
